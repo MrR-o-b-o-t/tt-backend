@@ -396,12 +396,19 @@ const getProjectById = async (req, res, next) => {
   res.json({ project: project.toObject({ getters: true }) });
 };
 
-const getProjectsByUserId = (req, res, next) => {
+const getProjectsByUserId = async (req, res, next) => {
   const userId = req.params.uid;
 
-  const projects = DUMMY_PROJECTS.filter((p) => {
-    return p.creator === userId;
-  });
+  let projects;
+  try {
+    projects = await Project.find({ creator: userId });
+  } catch (err) {
+    const error = new Error(
+      "Could not find projects for current user. Please try again.",
+      500
+    );
+    return next(error);
+  }
 
   if (!projects || projects.length === 0) {
     return next(
@@ -409,7 +416,9 @@ const getProjectsByUserId = (req, res, next) => {
     );
   }
 
-  res.json({ projects });
+  res.json({
+    projects: projects.map((project) => project.toObject({ getters: true })),
+  });
 };
 
 const createProject = async (req, res, next) => {
@@ -449,12 +458,25 @@ const updateProject = (req, res, next) => {
   res.status(200).json({ project: updatedproject });
 };
 
-const deleteProject = (req, res, next) => {
+const deleteProject = async (req, res, next) => {
   const projectId = req.params.pid;
-  if (!DUMMY_PROJECTS.find((p) => p.id === projectId)) {
-    throw new Error("Could not find a project for that id.", 404);
+
+  let project;
+
+  try {
+    project = Project.findById(projectId);
+  } catch (err) {
+    const error = new Error("Could not find that place. Try again.", 500);
+    return next(error);
   }
-  DUMMY_PROJECTS = DUMMY_PROJECTS.filter((p) => p.id !== projectId);
+
+  try {
+    await project.remove();
+  } catch (err) {
+    const error = new Error("Could not find that place. Try again.", 500);
+    return next(error);
+  }
+
   res.status(200).json({ message: "Deleted project." });
 };
 
